@@ -6553,16 +6553,17 @@
           alert('Kesimpulan berhasil disimpan! Jawaban terakhir yang Anda simpan inilah yang akan dicetak pada laporan akhir.');
         });
 
-        // Tombol Cetak
+        // Tombol Cetak â€“ Laporan Fungsi Kuadrat
         $('btnCetak') && $('btnCetak').addEventListener('click', () => {
-          const nama = $('lkpdNama').value.trim();
+          const nama  = $('lkpdNama').value.trim();
           const kelas = $('lkpdKelas').value.trim();
           if (!nama || !kelas) {
             alert('Silakan isi Nama dan Kelas terlebih dahulu sebelum mencetak laporan.');
             return;
           }
-          if (state.savedRows.length < 5) {
-            alert('Lakukan minimal 5 percobaan simulasi terlebih dahulu sebelum mencetak laporan.');
+          const rows = window.lkpdQuadRows || [];
+          if (rows.length < 5) {
+            alert('Lakukan minimal 5 percobaan simulasi di tab Simulasi terlebih dahulu sebelum mencetak laporan.');
             return;
           }
           if (!analisisFirst || !evaluasiFirst || !savedKesimpulan) {
@@ -6570,214 +6571,266 @@
             return;
           }
 
-          // AUTO-CEK JAWABAN (Cegah bypass cetak)
-          renderLKPDTable(true);
-
-          const rows = state.savedRows;
           const now = new Date();
           const tgl = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
           const jam = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-          // Helper functions
-          function getE1(v) { return { A: 'A. x² − 2x − 15 = 0', B: 'B. x² + 2x − 15 = 0', C: 'C. x² − 8x + 15 = 0', D: 'D. x² + 8x − 15 = 0', E: 'E. x² − 2x + 15 = 0' }[v] || '-'; }
-          function getE3(obj) { let s = []; if (obj.e3a) s.push('A'); if (obj.e3b) s.push('B'); if (obj.e3c) s.push('C'); if (obj.e3d) s.push('D'); if (obj.e3e) s.push('E'); return s.join(', '); }
-          function getE4(v) { return { A: 'x² − (x₁ + x₂)x + (x₁·x₂) = 0', B: 'x = −b / (2a)', C: 'x₁ · x₂ = c / a' }[v] || '-'; }
+          /* â”€â”€ Helper functions â”€â”€ */
+          function getE1(v) {
+            return ({ A:'A. x\u00B2 \u2212 2x \u2212 15 = 0', B:'B. x\u00B2 + 2x \u2212 15 = 0',
+                      C:'C. x\u00B2 \u2212 8x + 15 = 0', D:'D. x\u00B2 + 8x \u2212 15 = 0',
+                      E:'E. x\u00B2 \u2212 2x + 15 = 0' })[v] || '-';
+          }
+          function getE3(obj) {
+            if (!obj) return '-';
+            let s = [];
+            if (obj.e3a) s.push('A'); if (obj.e3b) s.push('B');
+            if (obj.e3c) s.push('C'); if (obj.e3d) s.push('D'); if (obj.e3e) s.push('E');
+            return s.join(', ') || '-';
+          }
+          function getE5(v) {
+            return ({ A:'x\u00B2 \u2212 (x\u2081 + x\u2082)x + (x\u2081\u00B7x\u2082) = 0',
+                      B:'x = \u2212b / (2a)', C:'x\u2081 \u00B7 x\u2082 = c / a' })[v] || '-';
+          }
+          function esc(s) {
+            return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          }
 
-          // Build table rows
+          /* â”€â”€ Tabel data pengamatan â”€â”€ */
           let tableRows = '';
           for (let i = 0; i < rows.length; i++) {
-            const r = rows[i];
-            const bg = i % 2 === 0 ? '#f8fafc' : '#eef3f8';
+            const r  = rows[i];
+            const bg = i % 2 === 0 ? '#f8fafc' : '#e8f4fd';
             tableRows += `<tr style="background:${bg}">
-      <td>${i + 1}</td><td>${r.isoShort}</td><td>${fmt1(r.m0)}</td><td>${fmt1(r.a0)}</td>
-      <td>${r.durasi}</td>
-      <td>${fmt1(r.mHitung)}</td><td>${fmt1(r.aHitung)}</td>
-      <td>${r.mUkur ? fmt1(r.mUkur) : '-'}</td><td>${r.aUkur ? fmt1(r.aUkur) : '-'}</td>
-    </tr>`;
+              <td>${i+1}</td>
+              <td style="font-weight:700;color:#0e7490;">${esc(r.x1)}</td>
+              <td style="font-weight:700;color:#0e7490;">${esc(r.x2)}</td>
+              <td>${esc(r.a)}</td>
+              <td style="font-weight:700;">${esc(r.sum)}</td>
+              <td style="font-weight:700;">${esc(r.product)}</td>
+              <td style="font-family:monospace;font-size:9pt;text-align:left;">${esc(r.eq)}</td>
+            </tr>`;
           }
 
-          // Build analisis
-          function buildAna(d, lbl) {
-            return `<div style="margin-bottom:14px;"><div style="font-weight:700;color:#0c4a6e;margin-bottom:6px;">${lbl}</div>
-    <div class="qa-block"><span class="qa-q">1. Jika kedua akar negatif, di mana letak titik potong parabola dan bagaimana tanda jumlah serta hasil kali akar?</span><div class="qa-a">${d.ans1}</div></div>
-    <div class="qa-block"><span class="qa-q">2. Mengapa akar kembar (x₁ = x₂) membuat parabola menyinggung sumbu-x? Jelaskan D dan titik puncaknya.</span><div class="qa-a">${d.ans2}</div></div>
-    <div class="qa-block"><span class="qa-q">3. Bagaimana pengaruh perubahan nilai a terhadap persamaan dan bentuk kurva, dengan akar tetap?</span><div class="qa-a">${d.ans3}</div></div>
-    <div class="qa-block"><span class="qa-q">4. Bagaimana persamaan kuadrat jika akar-akarnya x₁ = -p dan x₂ = p?</span><div class="qa-a">${d.ans4}</div></div>
-    <div class="qa-block"><span class="qa-q">5. Susunlah fungsi kuadrat lintasan proyektil (akar 0 dan 8, tinggi maksimum 16 m).</span><div class="qa-a">${d.ans5 || '-'}</div></div>
-    </div>`;
-          }
-          let analisisBlock = buildAna(analisisLatest || analisisFirst, 'Jawaban Analisis Data');
+          /* â”€â”€ Analisis Data â”€â”€ */
+          const ana = analisisLatest || analisisFirst || {};
+          const analisisBlock = `
+            <div class="qa-block"><span class="qa-q">1. Jika kedua akar bernilai negatif (x&#x2081; &lt; 0 dan x&#x2082; &lt; 0), di manakah letak titik potong kurva parabola terhadap sumbu-x? Bagaimanakah tanda jumlah akar dan hasil kali akar?</span><div class="qa-a">${esc(ana.ans1)||'&#8212;'}</div></div>
+            <div class="qa-block"><span class="qa-q">2. Mengapa akar kembar (x&#x2081; = x&#x2082; = p) membuat parabola menyinggung sumbu-x? Jelaskan nilai diskriminan D dan posisi titik puncaknya!</span><div class="qa-a">${esc(ana.ans2)||'&#8212;'}</div></div>
+            <div class="qa-block"><span class="qa-q">3. Bagaimana pengaruh perubahan nilai koefisien a terhadap persamaan dan bentuk kurva, dengan akar-akar yang tetap?</span><div class="qa-a">${esc(ana.ans3)||'&#8212;'}</div></div>
+            <div class="qa-block"><span class="qa-q">4. Bagaimanakah bentuk persamaan kuadrat jika akar-akarnya berlawanan tanda secara simetris (x&#x2081; = &#x2212;p dan x&#x2082; = p)?</span><div class="qa-a">${esc(ana.ans4)||'&#8212;'}</div></div>
+            <div class="qa-block"><span class="qa-q">5. Susunlah rumus fungsi kuadrat lintasan proyektil yang ditembakkan dari x&#x2081; = 0 dan mendarat pada x&#x2082; = 8 m, dengan tinggi maksimum 16 m!</span><div class="qa-a">${esc(ana.ans5)||'&#8212;'}</div></div>`;
 
-          // Build evaluasi
-          function buildEval(d, lbl) {
-            return `<div style="margin-bottom:14px;"><div style="font-weight:700;color:#0c4a6e;margin-bottom:6px;">${lbl}</div>
-    <div class="qa-block"><span class="qa-q">1. Persamaan kuadrat dengan akar x₁ = -3 dan x₂ = 5 (a = 1) adalah ...</span><div class="qa-a">${getE1(d.ans1)}</div></div>
-    <div class="qa-block"><span class="qa-q">2. Jika x₁ + x₂ = 0, sumbu simetri parabola berimpit dengan sumbu-y.</span><div class="qa-a">${d.ans2 === 'T' ? 'BENAR' : 'SALAH'}</div></div>
-    <div class="qa-block"><span class="qa-q">3. Akar x₁ = 2, x₂ = 6, a = -1. Pernyataan yang benar:</span><div class="qa-a">Opsi yang dipilih: ${getE3(d.e3)}</div></div>
-    <div class="qa-block"><span class="qa-q">4. Dua grafik dengan pasangan akar sama pasti memiliki bentuk dan puncak identik.</span><div class="qa-a">${d.ans4 === 'T' ? 'BENAR' : (d.ans4 === 'F' ? 'SALAH' : '-')}</div></div>
-    <div class="qa-block"><span class="qa-q">5. Pasangkan konsep dengan formulasi yang tepat:</span><div class="qa-a">1) Penyusunan persamaan dari akar &rarr; ${getE4(d.e5.e5_1)}<br>2) Sumbu simetri &rarr; ${getE4(d.e5.e5_2)}<br>3) Hasil kali akar &rarr; ${getE4(d.e5.e5_3)}</div></div>
-    </div>`;
-          }
-          let evaluasiBlock = buildEval(evaluasiLatest || evaluasiFirst, 'Jawaban Evaluasi');
+          /* â”€â”€ Evaluasi â”€â”€ */
+          const ev = evaluasiLatest || evaluasiFirst || {};
+          const evaluasiBlock = `
+            <div class="qa-block"><span class="qa-q">1. Persamaan kuadrat dengan akar x&#x2081; = &#x2212;3 dan x&#x2082; = 5 (a = 1) adalah ...</span><div class="qa-a">${esc(getE1(ev.ans1))}</div></div>
+            <div class="qa-block"><span class="qa-q">2. [BENAR/SALAH] Jika x&#x2081; + x&#x2082; = 0, sumbu simetri parabola berimpit dengan sumbu-y.</span><div class="qa-a">${ev.ans2==='T'?'&#10004; BENAR':(ev.ans2==='F'?'&#10008; SALAH':'&#8212;')}</div></div>
+            <div class="qa-block"><span class="qa-q">3. Akar x&#x2081; = 2, x&#x2082; = 6, a = &#x2212;1. Pilih semua pernyataan yang BENAR:</span><div class="qa-a">Opsi yang dipilih: ${esc(getE3(ev.e3))}</div></div>
+            <div class="qa-block"><span class="qa-q">4. [BENAR/SALAH] Dua grafik dengan pasangan akar yang sama pasti memiliki bentuk dan puncak yang identik.</span><div class="qa-a">${ev.ans4==='T'?'&#10004; BENAR':(ev.ans4==='F'?'&#10008; SALAH':'&#8212;')}</div></div>
+            <div class="qa-block"><span class="qa-q">5. Pasangkan konsep dengan formulasi yang tepat:</span><div class="qa-a">
+              1) Rumus penyusunan persamaan dari akar &rarr; ${esc(getE5(ev.e5&&ev.e5.e5_1))}<br>
+              2) Persamaan sumbu simetri kurva parabola &rarr; ${esc(getE5(ev.e5&&ev.e5.e5_2))}<br>
+              3) Hubungan hasil kali akar dengan konstanta &rarr; ${esc(getE5(ev.e5&&ev.e5.e5_3))}
+            </div></div>`;
 
-          // Status checks
+          /* â”€â”€ Status bar â”€â”€ */
           const statusItems = [
-            { label: 'Tujuan Kegiatan', done: true },
+            { label: 'Tujuan Kegiatan',                            done: true },
             { label: 'Data Pengamatan (' + rows.length + ' percobaan)', done: rows.length >= 5 },
-            { label: 'Analisis Data', done: !!analisisFirst },
-            { label: 'Evaluasi', done: !!evaluasiFirst },
-            { label: 'Kesimpulan', done: !!savedKesimpulan }
+            { label: 'Analisis Data',                              done: !!analisisFirst },
+            { label: 'Evaluasi',                                   done: !!evaluasiFirst },
+            { label: 'Kesimpulan',                                 done: !!savedKesimpulan }
           ];
           const allDone = statusItems.every(s => s.done);
-          let statusHtml = statusItems.map(s => `<span class="${s.done ? 'badge-ok' : 'badge-no'}">${s.done ? '&#10003;' : '&#10007;'} ${s.label}</span>`).join('');
-          statusHtml += `<div style="margin-top:8px;"><span class="${allDone ? 'status-done' : 'status-no'}">STATUS LAPORAN : ${allDone ? 'LENGKAP' : 'BELUM LENGKAP'}</span></div>`;
+          let statusHtml = statusItems.map(s =>
+            `<span class="${s.done?'badge-ok':'badge-no'}">${s.done?'&#10003;':'&#10007;'} ${s.label}</span>`
+          ).join('');
+          statusHtml += `<div style="margin-top:8px;"><span class="${allDone?'status-done':'status-no'}">STATUS LAPORAN : ${allDone?'LENGKAP &#10004;':'BELUM LENGKAP'}</span></div>`;
 
-          // SVG Atom icon for banner
-          const atomSvg = `<svg width="80" height="80" viewBox="0 0 100 100" style="opacity:0.3;position:absolute;right:30px;top:50%;transform:translateY(-50%);">
-    <circle cx="50" cy="50" r="8" fill="white"/>
-    <ellipse cx="50" cy="50" rx="40" ry="14" fill="none" stroke="white" stroke-width="1.5" transform="rotate(0 50 50)"/>
-    <ellipse cx="50" cy="50" rx="40" ry="14" fill="none" stroke="white" stroke-width="1.5" transform="rotate(60 50 50)"/>
-    <ellipse cx="50" cy="50" rx="40" ry="14" fill="none" stroke="white" stroke-width="1.5" transform="rotate(120 50 50)"/>
-    <circle cx="50" cy="50" r="3" fill="#22d3ee"/>
-  </svg>`;
+          /* â”€â”€ SVG Parabola untuk banner â”€â”€ */
+          const parabolaSvg = `<svg width="90" height="90" viewBox="0 0 100 100" style="opacity:0.22;position:absolute;right:20px;top:50%;transform:translateY(-50%);">
+            <path d="M5,95 Q50,-15 95,95" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="50" y1="2" x2="50" y2="98" stroke="white" stroke-width="1.2" stroke-dasharray="5,4" opacity="0.7"/>
+            <line x1="2" y1="95" x2="98" y2="95" stroke="white" stroke-width="1.2" stroke-dasharray="5,4" opacity="0.7"/>
+            <circle cx="50" cy="10" r="4.5" fill="#22d3ee"/>
+            <circle cx="5"  cy="95" r="3.5" fill="white" opacity="0.8"/>
+            <circle cx="95" cy="95" r="3.5" fill="white" opacity="0.8"/>
+          </svg>`;
 
-          // Section header builder
-          function sectionHead(num, title, color) {
-            return `<div style="background:${color};color:#fff;padding:10px 18px;border-radius:8px;margin:28px 0 14px 0;font-size:12pt;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:12px;">
-      <span style="background:rgba(255,255,255,0.25);border-radius:6px;padding:4px 12px;font-size:16pt;font-weight:900;">${num}</span>
-      <span>${title}</span>
-    </div>`;
-          }
-
+          /* â”€â”€ Full HTML report â”€â”€ */
           const fullHtml = `<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<title>Laporan_${nama}_${kelas}</title>
+<title>Laporan_${esc(nama)}_${esc(kelas)}</title>
 <style>
 @page{size:A4 portrait;margin:2cm 2cm 2cm 2.5cm;}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
 body{font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;font-size:10.5pt;color:#1e293b;line-height:1.65;text-align:justify;background:#fff;}
 .page-wrap{max-width:740px;margin:0 auto;padding:16px 28px 36px 28px;}
-.banner{background:linear-gradient(135deg,#0c2d48 0%,#0e7490 55%,#0891b2 100%) !important;border-radius:10px;padding:36px 30px;text-align:center;margin-bottom:18px;border-bottom:4px solid #22d3ee;position:relative;overflow:hidden;}
-.banner h1{font-size:20pt;font-weight:900;color:#ffffff !important;letter-spacing:3px;text-transform:uppercase;margin-bottom:4px;}
-.banner h2{font-size:14pt;font-weight:300;color:#a5f3fc !important;letter-spacing:5px;text-transform:uppercase;margin-top:6px;}
+.banner{background:linear-gradient(135deg,#0c2d48 0%,#0e7490 55%,#0891b2 100%) !important;border-radius:10px;padding:32px 30px;text-align:center;margin-bottom:18px;border-bottom:4px solid #22d3ee;position:relative;overflow:hidden;}
+.banner h1{font-size:18pt;font-weight:900;color:#fff !important;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:2px;}
+.banner h2{font-size:13pt;font-weight:400;color:#a5f3fc !important;letter-spacing:3px;text-transform:uppercase;margin-top:6px;}
 .banner-line{width:60px;height:2px;background:#22d3ee !important;margin:10px auto;}
-.banner-sub{font-size:8.5pt;color:#7dd3fc !important;letter-spacing:2px;text-transform:uppercase;margin-top:8px;}
+.banner-sub{font-size:8pt;color:#7dd3fc !important;letter-spacing:1.5px;text-transform:uppercase;margin-top:8px;}
 .id-card{display:flex;gap:0;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;margin-bottom:14px;}
-.id-field{flex:1;padding:12px 18px;background:#f1f5f9 !important;}
-.id-field:first-child{border-right:1px solid #cbd5e1;}
-.id-label{font-size:8pt;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
-.id-value{font-size:12pt;font-weight:700;color:#0c4a6e;}
-.status-bar{background:#f8fafc !important;border:1px solid #e2e8f0;border-radius:8px;padding:10px 16px;margin-bottom:18px;text-align:center;}
-.badge-ok{display:inline-block;padding:3px 10px;margin:3px;border-radius:20px;font-size:8.5pt;font-weight:600;background:#dcfce7 !important;color:#166534 !important;border:1px solid #86efac;}
-.badge-no{display:inline-block;padding:3px 10px;margin:3px;border-radius:20px;font-size:8.5pt;font-weight:600;background:#fee2e2 !important;color:#991b1b !important;border:1px solid #fca5a5;}
-.status-done{display:inline-block;padding:4px 16px;border-radius:20px;font-size:10pt;font-weight:800;letter-spacing:1px;color:#fff !important;background:#16a34a !important;margin-top:7px;}
-.status-no{display:inline-block;padding:4px 16px;border-radius:20px;font-size:10pt;font-weight:800;letter-spacing:1px;color:#fff !important;background:#dc2626 !important;margin-top:7px;}
-.sec-head{display:flex;align-items:center;gap:10px;border-radius:7px;padding:9px 16px;margin:20px 0 10px 0;}
-.sec-num{font-size:13pt;font-weight:900;background:rgba(255,255,255,0.25) !important;border-radius:5px;padding:2px 10px;line-height:1.4;color:#fff !important;}
-.sec-title{font-size:10.5pt;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#fff !important;}
+.id-field{flex:1;padding:10px 14px;background:#f1f5f9 !important;border-right:1px solid #cbd5e1;}
+.id-field:last-child{border-right:none;}
+.id-label{font-size:7.5pt;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+.id-value{font-size:10.5pt;font-weight:700;color:#0c4a6e;}
+.status-bar{background:#f8fafc !important;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:18px;text-align:center;}
+.badge-ok{display:inline-block;padding:2px 9px;margin:3px;border-radius:20px;font-size:8pt;font-weight:600;background:#dcfce7 !important;color:#166534 !important;border:1px solid #86efac;}
+.badge-no{display:inline-block;padding:2px 9px;margin:3px;border-radius:20px;font-size:8pt;font-weight:600;background:#fee2e2 !important;color:#991b1b !important;border:1px solid #fca5a5;}
+.status-done{display:inline-block;padding:3px 14px;border-radius:20px;font-size:9.5pt;font-weight:800;letter-spacing:1px;color:#fff !important;background:#16a34a !important;margin-top:6px;}
+.status-no{display:inline-block;padding:3px 14px;border-radius:20px;font-size:9.5pt;font-weight:800;letter-spacing:1px;color:#fff !important;background:#dc2626 !important;margin-top:6px;}
+.sec-head{display:flex;align-items:center;gap:10px;border-radius:7px;padding:8px 14px;margin:18px 0 10px 0;}
+.sec-num{font-size:12pt;font-weight:900;background:rgba(255,255,255,0.25) !important;border-radius:5px;padding:2px 9px;color:#fff !important;}
+.sec-title{font-size:10pt;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#fff !important;}
 .sec-cyan{background:linear-gradient(135deg,#0891b2,#06b6d4) !important;}
 .sec-blue{background:linear-gradient(135deg,#1d4ed8,#3b82f6) !important;}
 .sec-amber{background:linear-gradient(135deg,#b45309,#d97706) !important;}
 .sec-green{background:linear-gradient(135deg,#15803d,#16a34a) !important;}
 .sec-purple{background:linear-gradient(135deg,#6d28d9,#7c3aed) !important;}
-.data-table{width:100%;border-collapse:collapse;margin:8px 0 16px 0;font-size:9pt;}
+.data-table{width:100%;border-collapse:collapse;margin:8px 0 14px 0;font-size:8.5pt;}
 .data-table thead tr{background:linear-gradient(135deg,#0c4a6e,#0e7490) !important;}
-.data-table th{color:#fff !important;padding:7px 4px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;font-size:7.8pt;border:1px solid #0c4a6e;text-align:center;}
-.data-table td{padding:6px 4px;text-align:center;border:1px solid #cbd5e1;font-size:8.8pt;}
-.odd{background:#f8fafc !important;}.even{background:#e8f4fd !important;}
-.qa-block{border-left:3px solid #0e7490;padding:8px 12px;margin:6px 0;border-radius:0 5px 5px 0;background:#f8fafc !important;}
-.qa-q{font-weight:700;color:#0c4a6e !important;font-size:9.5pt;display:block;margin-bottom:3px;}
-.qa-a{color:#334155;font-size:9.5pt;line-height:1.55;}
-.conclusion-card{background:#f5f3ff !important;border-left:5px solid #7c3aed;border-radius:0 8px 8px 0;padding:14px 18px;margin:8px 0;font-size:10.5pt;line-height:1.65;color:#1e1b4b;}
-.page-footer{margin-top:24px;padding-top:8px;border-top:1.5px solid #e2e8f0;display:flex;justify-content:space-between;font-size:8pt;color:#94a3b8;}
-.closing{margin-top:30px;text-align:center;}
-.closing-line{width:150px;height:1px;background:#94a3b8;margin:0 auto 10px auto;}
-.closing-name{font-size:12pt;font-weight:700;color:#0c4a6e;}
+.data-table th{color:#fff !important;padding:6px 5px;font-weight:700;text-transform:uppercase;letter-spacing:0.2px;font-size:7.5pt;border:1px solid #0c4a6e;text-align:center;}
+.data-table td{padding:5px 5px;text-align:center;border:1px solid #cbd5e1;}
+.qa-block{border-left:3px solid #0e7490;padding:7px 11px;margin:5px 0;border-radius:0 5px 5px 0;background:#f8fafc !important;}
+.qa-q{font-weight:700;color:#0c4a6e !important;font-size:9pt;display:block;margin-bottom:2px;}
+.qa-a{color:#334155;font-size:9pt;line-height:1.55;white-space:pre-wrap;}
+.conclusion-card{background:#f5f3ff !important;border-left:5px solid #7c3aed;border-radius:0 8px 8px 0;padding:12px 16px;margin:8px 0;font-size:10pt;line-height:1.65;color:#1e1b4b;white-space:pre-wrap;}
+.page-footer{margin-top:20px;padding-top:7px;border-top:1.5px solid #e2e8f0;display:flex;justify-content:space-between;font-size:7.5pt;color:#94a3b8;}
 </style>
 </head>
 <body>
-<div class="watermark">VIRTUAL EXPERIMENT&#10;RADIOAKTIVITAS</div>
 <div class="page-wrap">
 
-  <!-- BANNER -->
   <div class="banner">
-    ${atomSvg}
+    ${parabolaSvg}
     <div class="banner-line"></div>
-    <h1>Laporan Virtual Experiment</h1>
-    <h2>Radioaktivitas</h2>
+    <h1>Laporan Virtual Lab Matematika</h1>
+    <h2>Menyusun Persamaan Fungsi Kuadrat</h2>
     <div class="banner-line"></div>
-    <div class="banner-sub">Laboratorium Fisika Digital &bull; Eksperimen Radioaktivitas</div>
+    <div class="banner-sub">Laboratorium Matematika Digital &bull; Kelas X SMA &bull; Fase E &bull; Kurikulum Merdeka</div>
   </div>
 
-  <!-- IDENTITAS -->
   <div class="id-card">
-    <div class="id-field">
-      <div class="id-label">Nama Murid</div>
-      <div class="id-value">${nama}</div>
-    </div>
-    <div class="id-field">
-      <div class="id-label">Kelas</div>
-      <div class="id-value">${kelas}</div>
-    </div>
+    <div class="id-field"><div class="id-label">Nama Siswa</div><div class="id-value">${esc(nama)}</div></div>
+    <div class="id-field"><div class="id-label">Kelas / Kelompok</div><div class="id-value">${esc(kelas)}</div></div>
+    <div class="id-field"><div class="id-label">Tanggal &amp; Waktu</div><div class="id-value">${tgl}, ${jam}</div></div>
   </div>
 
-  <!-- STATUS -->
   <div class="status-bar">${statusHtml}</div>
 
-  <!-- 01 TUJUAN -->
   <div class="sec-head sec-cyan"><span class="sec-num">01</span><span class="sec-title">Tujuan Kegiatan</span></div>
-  <p style="margin-bottom:14px;">Melalui simulasi ini, siswa diharapkan dapat: (1) memahami konsep peluruhan radioaktif dan waktu paruh; (2) menentukan massa sisa dan aktivitas sisa suatu isotop setelah selang waktu tertentu; (3) menganalisis pengaruh penghalang terhadap daya tembus sinar radioaktif; serta (4) melatih kemampuan pengambilan dan pengolahan data eksperimen secara sistematis dan ilmiah.</p>
+  <p style="margin-bottom:12px;">Melalui laboratorium virtual ini, peserta didik SMA Kelas X (Fase E) diharapkan mampu: (1) menentukan dan menghubungkan dua akar persamaan kuadrat (x&#x2081; dan x&#x2082;) dengan titik potong kurva parabola pada sumbu-x; (2) menghitung nilai jumlah akar (x&#x2081; + x&#x2082;) dan hasil kali akar (x&#x2081; &times; x&#x2082;) secara tepat berdasarkan Teorema Vieta; (3) menyusun persamaan kuadrat baru menggunakan bentuk faktor aljabar a(x &minus; x&#x2081;)(x &minus; x&#x2082;) = 0; serta (4) memeriksa kesesuaian persamaan kuadrat hasil penyusunan dengan komputasi aljabar dan visualisasi grafik parabola.</p>
 
-  <!-- 02 DATA -->
   <div class="sec-head sec-blue"><span class="sec-num">02</span><span class="sec-title">Data Hasil Pengamatan</span></div>
   <table class="data-table">
     <thead><tr>
-      <th>No</th><th>Isotop</th><th>m&#8320; (g)</th><th>A&#8320; (Ci)</th><th>Durasi (&times;t&frac12;)</th>
-      <th>m Sisa Hitung</th><th>A Sisa Hitung</th><th>m Sisa Ukur</th><th>A Sisa Ukur</th>
+      <th style="width:30px;">No</th>
+      <th>Akar 1 (x&#x2081;)</th>
+      <th>Akar 2 (x&#x2082;)</th>
+      <th>Koef. a</th>
+      <th>Jumlah Akar<br>(x&#x2081; + x&#x2082;)</th>
+      <th>Hasil Kali<br>(x&#x2081; &times; x&#x2082;)</th>
+      <th>Persamaan Kuadrat Baru</th>
     </tr></thead>
     <tbody>${tableRows}</tbody>
   </table>
 
-  <!-- 03 ANALISIS -->
   <div class="sec-head sec-amber"><span class="sec-num">03</span><span class="sec-title">Analisis Data</span></div>
   ${analisisBlock}
 
-  <!-- 04 EVALUASI -->
   <div class="sec-head sec-green"><span class="sec-num">04</span><span class="sec-title">Evaluasi</span></div>
   ${evaluasiBlock}
 
-  <!-- 05 KESIMPULAN -->
   <div class="sec-head sec-purple"><span class="sec-num">05</span><span class="sec-title">Kesimpulan</span></div>
-  <div class="conclusion-card">${savedKesimpulan.replace(/\n/g, '<br>')}</div>
+  <div class="conclusion-card">${esc(savedKesimpulan)}</div>
 
-  <!-- FOOTER -->
   <div class="page-footer">
-    <span>Virtual Experiment &mdash; Radioaktivitas</span>
+    <span>Virtual Lab Matematika &mdash; Menyusun Fungsi Kuadrat &bull; Kelas X SMA (Fase E)</span>
     <span>${tgl} &bull; ${jam}</span>
   </div>
 
-  <!-- CLOSING -->
-  <div class="closing">
-    <div class="closing-line"></div>
-    <div style="font-size:9pt;color:#64748b;margin-bottom:8px;">Laporan dibuat oleh:</div>
-    <div class="closing-name">${nama}</div>
-    <div class="closing-sub">${kelas}</div>
-    <div class="closing-date">${tgl}</div>
-    <div class="closing-line" style="margin-top:14px;"></div>
+  <div style="margin-top:28px;text-align:center;">
+    <div style="width:150px;height:1px;background:#94a3b8;margin:0 auto 10px auto;"></div>
+    <div style="font-size:8.5pt;color:#64748b;margin-bottom:6px;">Laporan dibuat oleh:</div>
+    <div style="font-size:11pt;font-weight:700;color:#0c4a6e;">${esc(nama)}</div>
+    <div style="font-size:9.5pt;color:#334155;">${esc(kelas)}</div>
+    <div style="font-size:8.5pt;color:#94a3b8;margin-top:3px;">${tgl}</div>
+    <div style="width:150px;height:1px;background:#94a3b8;margin:12px auto 0 auto;"></div>
   </div>
 
 </div>
 </body>
 </html>`;
 
-          const win = window.open('', '_blank');
-          if (!win) { alert('Popup diblokir browser. Izinkan popup untuk halaman ini agar laporan bisa dibuka.'); return; }
-          win.document.open();
-          win.document.write(fullHtml);
-          win.document.close();
-          setTimeout(() => { win.focus(); win.print(); }, 800);
+          /* â”€â”€ Fungsi download sebagai file HTML â”€â”€ */
+          function doDownload() {
+            const safeName  = (nama  || 'Siswa').replace(/[^a-zA-Z0-9_\-]/g, '_');
+            const safeKelas = (kelas || 'Kelas').replace(/[^a-zA-Z0-9_\-]/g, '_');
+            const fileName  = 'Laporan_' + safeName + '_' + safeKelas + '.html';
+            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1200);
+          }
+
+          /* â”€â”€ Popup pilihan: Download atau Buka & Cetak â”€â”€ */
+          const dlOverlay = document.createElement('div');
+          dlOverlay.className = 'popup-overlay show';
+          dlOverlay.style.zIndex = '99999';
+          dlOverlay.innerHTML = `
+            <div class="popup-box" style="text-align:center;max-width:440px;padding:2em 1.8em;">
+              <div style="font-size:28px;margin-bottom:.2em;">&#128438;</div>
+              <div style="font-size:17px;font-weight:800;color:var(--cyan);letter-spacing:.05em;margin-bottom:.35em;">Laporan Siap!</div>
+              <div style="font-size:13px;color:var(--ink-dim);margin-bottom:1.3em;line-height:1.6;">
+                Pilih cara mengambil laporan Anda:
+              </div>
+              <div style="display:flex;flex-direction:column;gap:.7em;">
+                <button id="btnDlDownload" style="background:linear-gradient(135deg,#0891b2,#06b6d4);border:none;border-radius:8px;color:#fff;padding:.9em 1.5em;font-weight:800;cursor:pointer;font-size:14px;letter-spacing:.04em;box-shadow:0 4px 14px rgba(6,182,212,.35);">
+                  &#11015; Unduh File HTML <span style="font-size:11px;font-weight:400;opacity:.85;">(Direkomendasikan)</span>
+                </button>
+                <button id="btnDlPrint" style="background:linear-gradient(135deg,#15803d,#16a34a);border:none;border-radius:8px;color:#fff;padding:.9em 1.5em;font-weight:800;cursor:pointer;font-size:14px;letter-spacing:.04em;box-shadow:0 4px 14px rgba(21,128,61,.35);">
+                  &#128424; Buka &amp; Cetak / Simpan PDF
+                </button>
+                <button id="btnDlClose" style="background:transparent;border:1px solid var(--panel-edge);border-radius:8px;color:var(--ink-faint);padding:.6em 1.5em;font-weight:700;cursor:pointer;font-size:13px;">
+                  Batal
+                </button>
+              </div>
+              <div style="margin-top:1em;font-size:10.5px;color:var(--ink-faint);line-height:1.6;background:rgba(63,214,255,.06);border-radius:6px;padding:.65em .9em;text-align:left;">
+                &#x2139;&#xFE0F; <b>Unduh HTML</b>: file tersimpan langsung ke komputer. Buka file di browser, lalu pilih <i>Ctrl+P &rarr; Save as PDF</i> untuk menyimpan sebagai PDF.<br>
+                <b>Buka &amp; Cetak</b>: membuka tab baru &#8212; pastikan popup browser diizinkan.
+              </div>
+            </div>
+          `;
+          document.body.appendChild(dlOverlay);
+
+          document.getElementById('btnDlDownload').addEventListener('click', () => {
+            document.body.removeChild(dlOverlay);
+            doDownload();
+          });
+          document.getElementById('btnDlPrint').addEventListener('click', () => {
+            document.body.removeChild(dlOverlay);
+            const win = window.open('', '_blank');
+            if (!win) {
+              alert('Popup diblokir browser.\n\nGunakan opsi "Unduh File HTML":\n1. Klik tombol Cetak Laporan\n2. Pilih "Unduh File HTML"\n3. Buka file yang diunduh di browser\n4. Tekan Ctrl+P lalu pilih "Save as PDF"');
+              return;
+            }
+            win.document.open();
+            win.document.write(fullHtml);
+            win.document.close();
+            setTimeout(() => { win.focus(); win.print(); }, 800);
+          });
+          document.getElementById('btnDlClose').addEventListener('click', () => {
+            document.body.removeChild(dlOverlay);
+          });
         });
 
         /* [LAB] DINONAKTIFKAN KARENA SIMULASI TELAH DIJADIKAN TEMPLATE KOSONG 
